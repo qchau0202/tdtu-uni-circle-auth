@@ -59,11 +59,15 @@ const parseStudentEmail = (email) => {
     const yearNumber = parseInt(yearDigits, 10);
     const fullYear = yearNumber >= 0 && yearNumber <= 99 ? currentCentury + yearNumber : yearNumber;
 
+    // Calculate academic year (4-year program): e.g., 2023-2027
+    const endYear = fullYear + 4;
+    const academicYearRange = `${fullYear}-${endYear}`;
+
     return {
         studentCode,
         facultyCode,
         facultyCodeChar,
-        academicYear: fullYear.toString(),
+        academicYear: academicYearRange,
         programType,
         studentIndex
     };

@@ -100,6 +100,9 @@ const register = async (req, res, next) => {
       .insert({
         student_id: authData.user.id,
         display_name: username,
+        dob: null,
+        phone_number: null,
+        faculty: null,
         academic_year: studentInfo.academicYear,
         bio: null,
         avatar_url: null,
@@ -166,10 +169,21 @@ const login = async (req, res, next) => {
       });
     }
 
+    // Fetch profile data
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select(`
+        *,
+        student:students(id, student_code, email)
+      `)
+      .eq('student_id', data.user.id)
+      .single();
+
     res.status(200).json({
       message: 'Login successful',
       session: data.session,
-      user: data.user
+      user: data.user,
+      profile: profileData
     });
   } catch (error) {
     next(error);
