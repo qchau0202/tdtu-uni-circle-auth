@@ -4,6 +4,33 @@ const authController = require('../controllers/auth_controller');
 
 /**
  * @swagger
+ * components:
+ *   schemas:
+ *     Error:
+ *       type: object
+ *       properties:
+ *         error:
+ *           type: object
+ *           properties:
+ *             code:
+ *               type: string
+ *               description: Error code identifier
+ *               example: "VALIDATION_ERROR"
+ *             message:
+ *               type: string
+ *               description: Human-readable error message
+ *               example: "Validation failed"
+ *             details:
+ *               type: string
+ *               description: Additional error details
+ *             status:
+ *               type: integer
+ *               description: HTTP status code
+ *               example: 400
+ */
+
+/**
+ * @swagger
  * /api/auth/register:
  *   post:
  *     summary: Register a new student
@@ -57,6 +84,25 @@ const authController = require('../controllers/auth_controller');
  *                   type: object
  *       400:
  *         description: Bad request - invalid email format, missing fields, or student already exists
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               validationError:
+ *                 summary: Validation failed
+ *                 value:
+ *                   error:
+ *                     code: "VALIDATION_ERROR"
+ *                     message: "student_email must be a valid TDTU student email"
+ *                     status: 400
+ *               registrationFailed:
+ *                 summary: Registration failed
+ *                 value:
+ *                   error:
+ *                     code: "REGISTRATION_FAILED"
+ *                     message: "Email already registered"
+ *                     status: 400
  */
 router.post('/register', authController.register);
 
@@ -105,8 +151,28 @@ router.post('/register', authController.register);
  *                       description: Refresh token
  *                 user:
  *                   type: object
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error:
+ *                 code: "VALIDATION_ERROR"
+ *                 message: "Email and password are required"
+ *                 status: 400
  *       401:
  *         description: Invalid credentials
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error:
+ *                 code: "LOGIN_FAILED"
+ *                 message: "Invalid email or password"
+ *                 status: 401
  */
 router.post('/login', authController.login);
 
@@ -123,6 +189,15 @@ router.post('/login', authController.login);
  *         description: Logout successful
  *       400:
  *         description: Logout failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error:
+ *                 code: "LOGOUT_FAILED"
+ *                 message: "Failed to logout user"
+ *                 status: 400
  */
 router.post('/logout', authController.logout);
 
@@ -156,8 +231,28 @@ router.post('/logout', authController.logout);
  *                   type: string
  *                 session:
  *                   type: object
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error:
+ *                 code: "VALIDATION_ERROR"
+ *                 message: "Refresh token is required"
+ *                 status: 400
  *       401:
  *         description: Invalid or expired refresh token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error:
+ *                 code: "REFRESH_TOKEN_FAILED"
+ *                 message: "Invalid or expired refresh token"
+ *                 status: 401
  */
 router.post('/refresh', authController.refreshToken);
 
@@ -188,6 +283,25 @@ router.post('/refresh', authController.refreshToken);
  *                       type: object
  *       401:
  *         description: Unauthorized - invalid or missing token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               missingToken:
+ *                 summary: Missing authorization token
+ *                 value:
+ *                   error:
+ *                     code: "MISSING_AUTH_TOKEN"
+ *                     message: "Authorization token is required"
+ *                     status: 401
+ *               unauthorized:
+ *                 summary: Invalid token
+ *                 value:
+ *                   error:
+ *                     code: "UNAUTHORIZED"
+ *                     message: "Invalid or expired token"
+ *                     status: 401
  */
 router.get('/me', authController.getCurrentUser);
 
