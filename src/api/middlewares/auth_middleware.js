@@ -2,9 +2,11 @@ const { getSupabaseClient } = require('../../infrastructure/database/supabase');
 
 const authenticateJWT = async (req, res, next) => {
     // Skip JWT check for health endpoint, API docs, and public auth endpoints
-    const publicPaths = ['/health', '/api-docs', '/api/auth/login', '/api/auth/register', '/api/auth/refresh'];
+    const publicPaths = ['/health', '/api-docs', '/login', '/register', '/refresh'];
+    const fullPath = req.baseUrl + req.path;
 
-    if (publicPaths.some(path => req.path === path || req.path.startsWith(path))) {
+    // Check both req.path and fullPath
+    if (publicPaths.some(path => req.path === path || req.path.startsWith(path) || fullPath.includes(path))) {
         return next();
     }
 
