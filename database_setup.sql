@@ -39,14 +39,20 @@ $$ LANGUAGE plpgsql;
 
 DO $$
 BEGIN
-    IF EXISTS (
-        SELECT 1 FROM pg_trigger WHERE tgname = 'check_student_email'
+  IF EXISTS (
+        SELECT 1
+  FROM pg_trigger
+  WHERE tgname = 'check_student_email'
     ) THEN
-        DROP TRIGGER check_student_email ON students;
-    END IF;
+  DROP TRIGGER check_student_email
+  ON students;
+END
+IF;
 END $$;
 CREATE TRIGGER check_student_email
-  BEFORE INSERT OR UPDATE ON students
+  BEFORE
+INSERT OR
+UPDATE ON students
   FOR EACH ROW
 EXECUTE FUNCTION validate_student_email
 ();
@@ -143,7 +149,8 @@ NOT NULL,
   parent_comment_id UUID REFERENCES comments
 (id) ON
 DELETE CASCADE,
-  likes_count INT DEFAULT 0,
+  likes_count INT
+DEFAULT 0,
   is_edited BOOLEAN DEFAULT FALSE,
   updated_at TIMESTAMPTZ DEFAULT NOW
 (),
@@ -225,6 +232,10 @@ SET NULL
 (255) NOT NULL,
   type VARCHAR
 (50) NOT NULL,
+  reference_id UUID,
+  reference_type VARCHAR
+(50),
+  is_read BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMPTZ DEFAULT NOW
 ()
 );
@@ -246,6 +257,7 @@ DELETE CASCADE,
 NOT NULL REFERENCES students
 (id) ON
 DELETE CASCADE,
+  bell_enabled BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMPTZ
 DEFAULT NOW
 (),
@@ -370,40 +382,58 @@ $$ LANGUAGE plpgsql;
 -- Apply triggers
 DO $$
 BEGIN
-    IF EXISTS (
-        SELECT 1 FROM pg_trigger WHERE tgname = 'update_profiles_updated_at'
+  IF EXISTS (
+        SELECT 1
+  FROM pg_trigger
+  WHERE tgname = 'update_profiles_updated_at'
     ) THEN
-        DROP TRIGGER update_profiles_updated_at ON profiles;
-    END IF;
+  DROP TRIGGER update_profiles_updated_at
+  ON profiles;
+END
+IF;
 END $$;
 CREATE TRIGGER update_profiles_updated_at
-  BEFORE UPDATE ON profiles
+  BEFORE
+UPDATE ON profiles
   FOR EACH ROW
-EXECUTE FUNCTION update_updated_at_column();
+EXECUTE FUNCTION update_updated_at_column
+();
 DO $$
 BEGIN
-    IF EXISTS (
-        SELECT 1 FROM pg_trigger WHERE tgname = 'update_threads_updated_at'
+  IF EXISTS (
+        SELECT 1
+  FROM pg_trigger
+  WHERE tgname = 'update_threads_updated_at'
     ) THEN
-        DROP TRIGGER update_threads_updated_at ON threads;
-    END IF;
+  DROP TRIGGER update_threads_updated_at
+  ON threads;
+END
+IF;
 END $$;
 CREATE TRIGGER update_threads_updated_at
-  BEFORE UPDATE ON threads
+  BEFORE
+UPDATE ON threads
   FOR EACH ROW
-EXECUTE FUNCTION update_updated_at_column();
+EXECUTE FUNCTION update_updated_at_column
+();
 DO $$
 BEGIN
-    IF EXISTS (
-        SELECT 1 FROM pg_trigger WHERE tgname = 'update_comments_updated_at'
+  IF EXISTS (
+        SELECT 1
+  FROM pg_trigger
+  WHERE tgname = 'update_comments_updated_at'
     ) THEN
-        DROP TRIGGER update_comments_updated_at ON comments;
-    END IF;
+  DROP TRIGGER update_comments_updated_at
+  ON comments;
+END
+IF;
 END $$;
 CREATE TRIGGER update_comments_updated_at
-  BEFORE UPDATE ON comments
+  BEFORE
+UPDATE ON comments
   FOR EACH ROW
-EXECUTE FUNCTION update_updated_at_column();
+EXECUTE FUNCTION update_updated_at_column
+();
 
 -- ============================================
 -- HELPER FUNCTIONS FOR FEED SERVICE
@@ -414,7 +444,7 @@ CREATE OR REPLACE FUNCTION increment_thread_comments
 (thread_id UUID)
 RETURNS void AS $$
 BEGIN
-    UPDATE threads
+  UPDATE threads
     SET comments_count = comments_count + 1
     WHERE id = thread_id;
 END;
@@ -425,7 +455,7 @@ CREATE OR REPLACE FUNCTION decrement_thread_comments
 (thread_id UUID)
 RETURNS void AS $$
 BEGIN
-    UPDATE threads
+  UPDATE threads
     SET comments_count = GREATEST
 (comments_count - 1, 0)
     WHERE id = thread_id;
@@ -437,10 +467,11 @@ CREATE OR REPLACE FUNCTION cleanup_old_deleted_threads
 ()
 RETURNS void AS $$
 BEGIN
-    DELETE FROM threads
-    WHERE is_deleted = true 
+  DELETE FROM threads
+    WHERE is_deleted = true
     AND deleted_at < NOW
-() - INTERVAL '30 days';
+() - INTERVAL
+  '30 days';
 END;
 $$ LANGUAGE plpgsql;
 
@@ -473,225 +504,394 @@ ALTER TABLE collections DISABLE ROW LEVEL SECURITY;
 ALTER TABLE notifications DISABLE ROW LEVEL SECURITY;
 
 -- Threads Policies (with privacy support)
-DO $$ BEGIN
-    IF EXISTS (
-        SELECT 1 FROM pg_policies WHERE policyname = 'Public threads are viewable by everyone' AND tablename = 'threads'
+DO $$ 
+BEGIN
+  IF EXISTS (
+        SELECT 1
+  FROM pg_policies
+  WHERE policyname = 'Public threads are viewable by everyone' AND tablename = 'threads'
     ) THEN
-        DROP POLICY "Public threads are viewable by everyone" ON threads;
-    END IF;
+  DROP POLICY "Public threads are viewable by everyone" ON threads;
+END
+IF;
 END $$;
 CREATE POLICY "Public threads are viewable by everyone"
-  ON threads FOR SELECT TO authenticated 
-  USING (visibility = 'public' AND is_deleted = false);
-DO $$ BEGIN
-    IF EXISTS (
-        SELECT 1 FROM pg_policies WHERE policyname = 'Private threads are viewable by author and allowed viewers' AND tablename = 'threads'
+  ON threads FOR
+SELECT TO authenticated
+USING
+(visibility = 'public' AND is_deleted = false);
+DO $$ 
+BEGIN
+  IF EXISTS (
+        SELECT 1
+  FROM pg_policies
+  WHERE policyname = 'Private threads are viewable by author and allowed viewers' AND tablename = 'threads'
     ) THEN
-        DROP POLICY "Private threads are viewable by author and allowed viewers" ON threads;
-    END IF;
+  DROP POLICY "Private threads are viewable by author and allowed viewers" ON threads;
+END
+IF;
 END $$;
 CREATE POLICY "Private threads are viewable by author and allowed viewers"
-  ON threads FOR SELECT TO authenticated 
-  USING (
+  ON threads FOR
+SELECT TO authenticated
+USING
+(
     visibility = 'private' 
     AND is_deleted = false 
-    AND (
-      author_id = auth.uid() 
-      OR auth.uid() = ANY(allowed_viewers)
+    AND
+(
+      author_id = auth.uid
+() 
+      OR auth.uid
+() = ANY
+(allowed_viewers)
     )
   );
-DO $$ BEGIN
-    IF EXISTS (
-        SELECT 1 FROM pg_policies WHERE policyname = 'Deleted threads are viewable only by author' AND tablename = 'threads'
+DO $$ 
+BEGIN
+  IF EXISTS (
+        SELECT 1
+  FROM pg_policies
+  WHERE policyname = 'Deleted threads are viewable only by author' AND tablename = 'threads'
     ) THEN
-        DROP POLICY "Deleted threads are viewable only by author" ON threads;
-    END IF;
+  DROP POLICY "Deleted threads are viewable only by author" ON threads;
+END
+IF;
 END $$;
 CREATE POLICY "Deleted threads are viewable only by author"
-  ON threads FOR SELECT TO authenticated 
-  USING (is_deleted = true AND author_id = auth.uid());
-DO $$ BEGIN
-    IF EXISTS (
-        SELECT 1 FROM pg_policies WHERE policyname = 'Allow authenticated users to create threads' AND tablename = 'threads'
+  ON threads FOR
+SELECT TO authenticated
+USING
+(is_deleted = true AND author_id = auth.uid
+());
+DO $$ 
+BEGIN
+  IF EXISTS (
+        SELECT 1
+  FROM pg_policies
+  WHERE policyname = 'Allow authenticated users to create threads' AND tablename = 'threads'
     ) THEN
-        DROP POLICY "Allow authenticated users to create threads" ON threads;
-    END IF;
+  DROP POLICY "Allow authenticated users to create threads" ON threads;
+END
+IF;
 END $$;
 CREATE POLICY "Allow authenticated users to create threads"
-  ON threads FOR INSERT TO authenticated WITH CHECK (author_id = auth.uid());
-DO $$ BEGIN
-    IF EXISTS (
-        SELECT 1 FROM pg_policies WHERE policyname = 'Allow authors to update their threads' AND tablename = 'threads'
+  ON threads FOR
+INSERT TO authenticated WITH CHECK (
+author_id
+=
+auth
+.uid
+());
+DO $$ 
+BEGIN
+  IF EXISTS (
+        SELECT 1
+  FROM pg_policies
+  WHERE policyname = 'Allow authors to update their threads' AND tablename = 'threads'
     ) THEN
-        DROP POLICY "Allow authors to update their threads" ON threads;
-    END IF;
+  DROP POLICY "Allow authors to update their threads" ON threads;
+END
+IF;
 END $$;
 CREATE POLICY "Allow authors to update their threads"
-  ON threads FOR UPDATE TO authenticated 
-  USING (author_id = auth.uid()) WITH CHECK(author_id = auth.uid());
-DO $$ BEGIN
-    IF EXISTS (
-        SELECT 1 FROM pg_policies WHERE policyname = 'Allow authors to delete their threads' AND tablename = 'threads'
+  ON threads FOR
+UPDATE TO authenticated 
+  USING (author_id = auth.uid())
+WITH CHECK
+(author_id = auth.uid
+());
+DO $$ 
+BEGIN
+  IF EXISTS (
+        SELECT 1
+  FROM pg_policies
+  WHERE policyname = 'Allow authors to delete their threads' AND tablename = 'threads'
     ) THEN
-        DROP POLICY "Allow authors to delete their threads" ON threads;
-    END IF;
+  DROP POLICY "Allow authors to delete their threads" ON threads;
+END
+IF;
 END $$;
 CREATE POLICY "Allow authors to delete their threads"
-  ON threads FOR DELETE TO authenticated USING (author_id = auth.uid());
+  ON threads FOR
+DELETE TO authenticated USING (author_id = auth.uid());
 
 -- Comments Policies (with thread privacy support)
-DO $$ BEGIN
-    IF EXISTS (
-        SELECT 1 FROM pg_policies WHERE policyname = 'Comments on public threads are viewable by everyone' AND tablename = 'comments'
+DO $$ 
+BEGIN
+  IF EXISTS (
+        SELECT 1
+  FROM pg_policies
+  WHERE policyname = 'Comments on public threads are viewable by everyone' AND tablename = 'comments'
     ) THEN
-        DROP POLICY "Comments on public threads are viewable by everyone" ON comments;
-    END IF;
+  DROP POLICY "Comments on public threads are viewable by everyone" ON comments;
+END
+IF;
 END $$;
 CREATE POLICY "Comments on public threads are viewable by everyone"
-  ON comments FOR SELECT TO authenticated 
-  USING (
-    EXISTS (
-      SELECT 1 FROM threads 
-      WHERE threads.id = comments.thread_id 
-      AND threads.visibility = 'public' 
-      AND threads.is_deleted = false
+  ON comments FOR
+SELECT TO authenticated
+USING
+(
+    EXISTS
+(
+      SELECT 1
+FROM threads
+WHERE threads.id = comments.thread_id
+  AND threads.visibility = 'public'
+  AND threads.is_deleted = false
     )
-  );
-DO $$ BEGIN
-    IF EXISTS (
-        SELECT 1 FROM pg_policies WHERE policyname = 'Comments on private threads are viewable by allowed users' AND tablename = 'comments'
+);
+DO $$ 
+BEGIN
+  IF EXISTS (
+        SELECT 1
+  FROM pg_policies
+  WHERE policyname = 'Comments on private threads are viewable by allowed users' AND tablename = 'comments'
     ) THEN
-        DROP POLICY "Comments on private threads are viewable by allowed users" ON comments;
-    END IF;
+  DROP POLICY "Comments on private threads are viewable by allowed users" ON comments;
+END
+IF;
 END $$;
 CREATE POLICY "Comments on private threads are viewable by allowed users"
-  ON comments FOR SELECT TO authenticated 
-  USING (
-    EXISTS (
-      SELECT 1 FROM threads 
-      WHERE threads.id = comments.thread_id 
-      AND threads.visibility = 'private' 
-      AND threads.is_deleted = false
-      AND (
-        threads.author_id = auth.uid() 
-        OR auth.uid() = ANY(threads.allowed_viewers)
+  ON comments FOR
+SELECT TO authenticated
+USING
+(
+    EXISTS
+(
+      SELECT 1
+FROM threads
+WHERE threads.id = comments.thread_id
+  AND threads.visibility = 'private'
+  AND threads.is_deleted = false
+  AND (
+        threads.author_id = auth.uid()
+  OR auth.uid() = ANY(threads.allowed_viewers)
       )
-    )
+)
   );
-DO $$ BEGIN
-    IF EXISTS (
-        SELECT 1 FROM pg_policies WHERE policyname = 'Allow authenticated users to create comments' AND tablename = 'comments'
+DO $$ 
+BEGIN
+  IF EXISTS (
+        SELECT 1
+  FROM pg_policies
+  WHERE policyname = 'Allow authenticated users to create comments' AND tablename = 'comments'
     ) THEN
-        DROP POLICY "Allow authenticated users to create comments" ON comments;
-    END IF;
+  DROP POLICY "Allow authenticated users to create comments" ON comments;
+END
+IF;
 END $$;
 CREATE POLICY "Allow authenticated users to create comments"
-  ON comments FOR INSERT TO authenticated WITH CHECK (author_id = auth.uid());
-DO $$ BEGIN
-    IF EXISTS (
-        SELECT 1 FROM pg_policies WHERE policyname = 'Allow authors to update their comments' AND tablename = 'comments'
+  ON comments FOR
+INSERT TO authenticated WITH CHECK (
+author_id
+=
+auth
+.uid
+());
+DO $$ 
+BEGIN
+  IF EXISTS (
+        SELECT 1
+  FROM pg_policies
+  WHERE policyname = 'Allow authors to update their comments' AND tablename = 'comments'
     ) THEN
-        DROP POLICY "Allow authors to update their comments" ON comments;
-    END IF;
+  DROP POLICY "Allow authors to update their comments" ON comments;
+END
+IF;
 END $$;
 CREATE POLICY "Allow authors to update their comments"
-  ON comments FOR UPDATE TO authenticated 
-  USING (author_id = auth.uid()) WITH CHECK(author_id = auth.uid());
-DO $$ BEGIN
-    IF EXISTS (
-        SELECT 1 FROM pg_policies WHERE policyname = 'Allow authors to delete their comments' AND tablename = 'comments'
+  ON comments FOR
+UPDATE TO authenticated 
+  USING (author_id = auth.uid())
+WITH CHECK
+(author_id = auth.uid
+());
+DO $$ 
+BEGIN
+  IF EXISTS (
+        SELECT 1
+  FROM pg_policies
+  WHERE policyname = 'Allow authors to delete their comments' AND tablename = 'comments'
     ) THEN
-        DROP POLICY "Allow authors to delete their comments" ON comments;
-    END IF;
+  DROP POLICY "Allow authors to delete their comments" ON comments;
+END
+IF;
 END $$;
 CREATE POLICY "Allow authors to delete their comments"
-  ON comments FOR DELETE TO authenticated USING (author_id = auth.uid());
+  ON comments FOR
+DELETE TO authenticated USING (author_id = auth.uid());
 
 -- Profiles Policies
-DROP POLICY IF EXISTS "Allow authenticated users to read all profiles" ON profiles;
+DROP POLICY
+IF EXISTS "Allow authenticated users to read all profiles" ON profiles;
 CREATE POLICY "Allow authenticated users to read all profiles"
-  ON profiles FOR SELECT TO authenticated USING (true);
-DROP POLICY IF EXISTS "Allow users to update their own profile" ON profiles;
+  ON profiles FOR
+SELECT TO authenticated
+USING
+(true);
+DROP POLICY
+IF EXISTS "Allow users to update their own profile" ON profiles;
 CREATE POLICY "Allow users to update their own profile"
-  ON profiles FOR UPDATE TO authenticated 
-  USING (student_id = auth.uid()) WITH CHECK (student_id = auth.uid());
-DROP POLICY IF EXISTS "Allow authenticated users to insert profiles" ON profiles;
+  ON profiles FOR
+UPDATE TO authenticated 
+  USING (student_id = auth.uid())
+WITH CHECK
+(student_id = auth.uid
+());
+DROP POLICY
+IF EXISTS "Allow authenticated users to insert profiles" ON profiles;
 CREATE POLICY "Allow authenticated users to insert profiles"
-  ON profiles FOR INSERT TO authenticated WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow service role to insert profiles" ON profiles;
+  ON profiles FOR
+INSERT TO authenticated WITH CHECK (
+true);
+DROP POLICY
+IF EXISTS "Allow service role to insert profiles" ON profiles;
 CREATE POLICY "Allow service role to insert profiles"
-  ON profiles FOR INSERT TO service_role WITH CHECK (true);
+  ON profiles FOR
+INSERT TO service_role WITH CHECK (
+true);
 
 -- Threads Policies
-DROP POLICY IF EXISTS "Allow authenticated users to read all threads" ON threads;
+DROP POLICY
+IF EXISTS "Allow authenticated users to read all threads" ON threads;
 CREATE POLICY "Allow authenticated users to read all threads"
-  ON threads FOR SELECT TO authenticated USING (true);
-DROP POLICY IF EXISTS "Allow authenticated users to create threads" ON threads;
+  ON threads FOR
+SELECT TO authenticated
+USING
+(true);
+DROP POLICY
+IF EXISTS "Allow authenticated users to create threads" ON threads;
 CREATE POLICY "Allow authenticated users to create threads"
-  ON threads FOR INSERT TO authenticated WITH CHECK (author_id = auth.uid());
-DROP POLICY IF EXISTS "Allow authors to update their threads" ON threads;
+  ON threads FOR
+INSERT TO authenticated WITH CHECK (
+author_id
+=
+auth
+.uid
+());
+DROP POLICY
+IF EXISTS "Allow authors to update their threads" ON threads;
 CREATE POLICY "Allow authors to update their threads"
-  ON threads FOR UPDATE TO authenticated USING (author_id = auth.uid());
-DROP POLICY IF EXISTS "Allow authors to delete their threads" ON threads;
+  ON threads FOR
+UPDATE TO authenticated USING (author_id = auth.uid());
+DROP POLICY
+IF EXISTS "Allow authors to delete their threads" ON threads;
 CREATE POLICY "Allow authors to delete their threads"
-  ON threads FOR DELETE TO authenticated USING (author_id = auth.uid());
+  ON threads FOR
+DELETE TO authenticated USING (author_id = auth.uid());
 
 -- Comments Policies
-DROP POLICY IF EXISTS "Allow authenticated users to read all comments" ON comments;
+DROP POLICY
+IF EXISTS "Allow authenticated users to read all comments" ON comments;
 CREATE POLICY "Allow authenticated users to read all comments"
-  ON comments FOR SELECT TO authenticated USING (true);
-DROP POLICY IF EXISTS "Allow authenticated users to create comments" ON comments;
+  ON comments FOR
+SELECT TO authenticated
+USING
+(true);
+DROP POLICY
+IF EXISTS "Allow authenticated users to create comments" ON comments;
 CREATE POLICY "Allow authenticated users to create comments"
-  ON comments FOR INSERT TO authenticated WITH CHECK (author_id = auth.uid());
-DROP POLICY IF EXISTS "Allow authors to update their comments" ON comments;
+  ON comments FOR
+INSERT TO authenticated WITH CHECK (
+author_id
+=
+auth
+.uid
+());
+DROP POLICY
+IF EXISTS "Allow authors to update their comments" ON comments;
 CREATE POLICY "Allow authors to update their comments"
-  ON comments FOR UPDATE TO authenticated USING (author_id = auth.uid());
-DROP POLICY IF EXISTS "Allow authors to delete their comments" ON comments;
+  ON comments FOR
+UPDATE TO authenticated USING (author_id = auth.uid());
+DROP POLICY
+IF EXISTS "Allow authors to delete their comments" ON comments;
 CREATE POLICY "Allow authors to delete their comments"
-  ON comments FOR DELETE TO authenticated USING (author_id = auth.uid());
+  ON comments FOR
+DELETE TO authenticated USING (author_id = auth.uid());
 
 -- Resources Policies
-DROP POLICY IF EXISTS "Allow authenticated users to read all resources" ON resources;
+DROP POLICY
+IF EXISTS "Allow authenticated users to read all resources" ON resources;
 CREATE POLICY "Allow authenticated users to read all resources"
-  ON resources FOR SELECT TO authenticated USING (true);
-DROP POLICY IF EXISTS "Allow authenticated users to create resources" ON resources;
+  ON resources FOR
+SELECT TO authenticated
+USING
+(true);
+DROP POLICY
+IF EXISTS "Allow authenticated users to create resources" ON resources;
 CREATE POLICY "Allow authenticated users to create resources"
-  ON resources FOR INSERT TO authenticated WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow service role to create resources" ON resources;
+  ON resources FOR
+INSERT TO authenticated WITH CHECK (
+true);
+DROP POLICY
+IF EXISTS "Allow service role to create resources" ON resources;
 CREATE POLICY "Allow service role to create resources"
-  ON resources FOR INSERT TO service_role WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow owners to update their resources" ON resources;
+  ON resources FOR
+INSERT TO service_role WITH CHECK (
+true);
+DROP POLICY
+IF EXISTS "Allow owners to update their resources" ON resources;
 CREATE POLICY "Allow owners to update their resources"
-  ON resources FOR UPDATE TO authenticated USING (owner_id = auth.uid());
-DROP POLICY IF EXISTS "Allow owners to delete their resources" ON resources;
+  ON resources FOR
+UPDATE TO authenticated USING (owner_id = auth.uid());
+DROP POLICY
+IF EXISTS "Allow owners to delete their resources" ON resources;
 CREATE POLICY "Allow owners to delete their resources"
-  ON resources FOR DELETE TO authenticated USING (owner_id = auth.uid());
+  ON resources FOR
+DELETE TO authenticated USING (owner_id = auth.uid());
 
 -- Collections Policies
-DROP POLICY IF EXISTS "Allow users to read public collections" ON collections;
+DROP POLICY
+IF EXISTS "Allow users to read public collections" ON collections;
 CREATE POLICY "Allow users to read public collections"
-  ON collections FOR SELECT TO authenticated 
-  USING (is_public = true OR owner_id = auth.uid());
-DROP POLICY IF EXISTS "Allow authenticated users to create collections" ON collections;
+  ON collections FOR
+SELECT TO authenticated
+USING
+(is_public = true OR owner_id = auth.uid
+());
+DROP POLICY
+IF EXISTS "Allow authenticated users to create collections" ON collections;
 CREATE POLICY "Allow authenticated users to create collections"
-  ON collections FOR INSERT TO authenticated WITH CHECK (owner_id = auth.uid());
-DROP POLICY IF EXISTS "Allow owners to update their collections" ON collections;
+  ON collections FOR
+INSERT TO authenticated WITH CHECK (
+owner_id
+=
+auth
+.uid
+());
+DROP POLICY
+IF EXISTS "Allow owners to update their collections" ON collections;
 CREATE POLICY "Allow owners to update their collections"
-  ON collections FOR UPDATE TO authenticated USING (owner_id = auth.uid());
-DROP POLICY IF EXISTS "Allow owners to delete their collections" ON collections;
+  ON collections FOR
+UPDATE TO authenticated USING (owner_id = auth.uid());
+DROP POLICY
+IF EXISTS "Allow owners to delete their collections" ON collections;
 CREATE POLICY "Allow owners to delete their collections"
-  ON collections FOR DELETE TO authenticated USING (owner_id = auth.uid());
+  ON collections FOR
+DELETE TO authenticated USING (owner_id = auth.uid());
 
 -- Notifications Policies
-DROP POLICY IF EXISTS "Allow users to read their own notifications" ON notifications;
+DROP POLICY
+IF EXISTS "Allow users to read their own notifications" ON notifications;
 CREATE POLICY "Allow users to read their own notifications"
-  ON notifications FOR SELECT TO authenticated USING (recipient_id = auth.uid());
-DROP POLICY IF EXISTS "Allow system to create notifications" ON notifications;
+  ON notifications FOR
+SELECT TO authenticated
+USING
+(recipient_id = auth.uid
+());
+DROP POLICY
+IF EXISTS "Allow system to create notifications" ON notifications;
 CREATE POLICY "Allow system to create notifications"
-  ON notifications FOR INSERT TO authenticated WITH CHECK (true);
-DROP POLICY IF EXISTS "Allow users to update their own notifications" ON notifications;
+  ON notifications FOR
+INSERT TO authenticated WITH CHECK (
+true);
+DROP POLICY
+IF EXISTS "Allow users to update their own notifications" ON notifications;
 CREATE POLICY "Allow users to update their own notifications"
-  ON notifications FOR UPDATE TO authenticated USING (recipient_id = auth.uid());
+  ON notifications FOR
+UPDATE TO authenticated USING (recipient_id = auth.uid());
 
 -- ============================================
 -- GRANT PERMISSIONS
