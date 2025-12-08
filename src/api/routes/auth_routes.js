@@ -178,31 +178,6 @@ router.post('/login', authController.login);
 
 /**
  * @swagger
- * /api/auth/logout:
- *   post:
- *     summary: Logout current user
- *     tags: [Authentication]
- *     security:
- *       - BearerAuth: []
- *     responses:
- *       200:
- *         description: Logout successful
- *       400:
- *         description: Logout failed
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *             example:
- *               error:
- *                 code: "LOGOUT_FAILED"
- *                 message: "Failed to logout user"
- *                 status: 400
- */
-router.post('/logout', authController.logout);
-
-/**
- * @swagger
  * /api/auth/refresh:
  *   post:
  *     summary: Refresh access token
@@ -255,54 +230,5 @@ router.post('/logout', authController.logout);
  *                 status: 401
  */
 router.post('/refresh', authController.refreshToken);
-
-/**
- * @swagger
- * /api/auth/me:
- *   get:
- *     summary: Get current authenticated user
- *     tags: [Authentication]
- *     security:
- *       - BearerAuth: []
- *     responses:
- *       200:
- *         description: User data retrieved successfully
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 user:
- *                   type: object
- *                   properties:
- *                     id:
- *                       type: string
- *                     email:
- *                       type: string
- *                     user_metadata:
- *                       type: object
- *       401:
- *         description: Unauthorized - invalid or missing token
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *             examples:
- *               missingToken:
- *                 summary: Missing authorization token
- *                 value:
- *                   error:
- *                     code: "MISSING_AUTH_TOKEN"
- *                     message: "Authorization token is required"
- *                     status: 401
- *               unauthorized:
- *                 summary: Invalid token
- *                 value:
- *                   error:
- *                     code: "UNAUTHORIZED"
- *                     message: "Invalid or expired token"
- *                     status: 401
- */
-router.get('/me', authController.getCurrentUser);
 
 module.exports = router;
